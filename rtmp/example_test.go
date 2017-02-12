@@ -23,6 +23,8 @@ package rtmp_test
 
 import (
 	"bytes"
+	"encoding/binary"
+	"fmt"
 	"github.com/SnailTowardThesun/go-oryx-lib/rtmp"
 	"os"
 	"testing"
@@ -33,6 +35,11 @@ func TestMain(m *testing.M) {
 }
 
 // unit test
+func TestAMF0Message_Write(t *testing.T) {
+	msg := &rtmp.AMF0Message{}
+	msg.Write(nil)
+}
+
 func TestNewC0C1Package(t *testing.T) {
 	pkt := rtmp.NewC0C1Package()
 	if pkt == nil {
@@ -206,14 +213,14 @@ func TestParseC2Package(t *testing.T) {
 func TestRtmpChunkMessage_GetCSID(t *testing.T) {
 	msg := &rtmp.RtmpChunkMessage{}
 	msg.BasicHeader = make([]byte, 3)
-	
+
 	// id = 32
 	msg.BasicHeader[0] = 0x20
 	if msg.GetCSID() != 32 {
 		t.Error("get id failed when id=32")
 		return
 	}
-	
+
 	// id = 96
 	msg.BasicHeader[0] = 0x00
 	msg.BasicHeader[1] = 0x20
@@ -221,13 +228,114 @@ func TestRtmpChunkMessage_GetCSID(t *testing.T) {
 		t.Error("get id failed when id=96")
 		return
 	}
-	
+
 	// id = 608
 	msg.BasicHeader[0] = 0x01
 	msg.BasicHeader[1] = 0x20
 	msg.BasicHeader[2] = 0x02
 	if msg.GetCSID() != 608 {
 		t.Error("get id failed when id=544", msg.GetCSID())
+		return
+	}
+}
+
+func TestChunkMessage(t *testing.T) {
+	chunkSize := 128
+	rd := rtmp.RtmpRandomData(512 + 32)
+
+	list, err := rtmp.ChunkMessage(rd, uint32(chunkSize), 4, 9, 1234)
+	if err != nil {
+		t.Error("covert byte array into chunk message failed. err is", err)
+		return
+	}
+
+	if len(list) < 5 {
+		t.Error(fmt.Sprintf("the number=%v of chunked messages is invalid, should be 5", len(list)))
+		return
+	}
+
+	if list[0].Formt != 0 {
+		t.Error(fmt.Sprintf("format=%v of first message should be 3", list[0].Formt))
+		return
+	}
+
+	if len(list[0].Data) != 128 {
+		t.Error(fmt.Sprintf("data length=%v in first message should be chunk size=%v", len(list[0].Data), chunkSize))
+		return
+	}
+
+	if list[4].Formt != 3 {
+		t.Error(fmt.Sprintf("format=%v of first message should be 3", list[0].Formt))
+		return
+	}
+
+	if len(list[4].Data) != 32 {
+		t.Error(fmt.Sprintf("data length=%v in last message should be %v", len(list[4].Data), 32))
+		return
+	}
+}
+
+func TestRtmpChunkMessage_Read(t *testing.T) {
+	rd := rtmp.RtmpRandomData(512)
+
+	list, err := rtmp.ChunkMessage(rd, 1024, 4, 9, 1234)
+	if err != nil {
+		t.Error("create chunk message failed. err is", err)
+		return
+	}
+
+	r := bytes.NewReader(list[0].Dumps())
+	msg := &rtmp.RtmpChunkMessage{}
+	if err := msg.Read(r, 1024); err != nil {
+		t.Error("chunk message read failed. err is", err)
+		return
+	}
+
+	if !bytes.Equal(msg.BasicHeader, list[0].BasicHeader) {
+		t.Error("basic header is invalid")
+		return
+	}
+
+	if !bytes.Equal(msg.MessageHeader, list[0].MessageHeader) {
+		t.Error("message header is invalid")
+		return
+	}
+
+	if !bytes.Equal(msg.Data, list[0].Data) {
+		t.Error("data is invalid")
+		return
+	}
+}
+
+func TestNewRtmpMsgSetChunkSize(t *testing.T) {
+	chunkSize := uint32(512)
+	StreamID := uint32(1024)
+
+	pkg := rtmp.NewRtmpMsgSetChunkSize(chunkSize, StreamID)
+
+	if pkg.MessageType != 1 {
+		t.Error("message type invalid")
+		return
+	}
+
+	if pkg.PayloadLength != 4 {
+		t.Error("message length invalid")
+		return
+	}
+
+	if pkg.Timestamp < 1 {
+		t.Error("time stamp invalid")
+		return
+	}
+
+	if pkg.StreamID != StreamID {
+		t.Error("message id invalid")
+		return
+	}
+
+	cs := binary.BigEndian.Uint32(pkg.PayLoad)
+	if cs != chunkSize {
+		t.Error("payload invalid")
 		return
 	}
 }

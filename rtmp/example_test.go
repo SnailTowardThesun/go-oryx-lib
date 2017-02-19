@@ -35,11 +35,6 @@ func TestMain(m *testing.M) {
 }
 
 // unit test
-func TestAMF0Message_Write(t *testing.T) {
-	msg := &rtmp.AMF0Message{}
-	msg.Write(nil)
-}
-
 func TestNewC0C1Package(t *testing.T) {
 	pkt := rtmp.NewC0C1Package()
 	if pkt == nil {

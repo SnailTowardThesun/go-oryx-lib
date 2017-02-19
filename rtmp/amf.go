@@ -32,7 +32,7 @@ import (
 )
 
 const (
-	NUMBER_MARKE        = 0x00
+	NUMBER_MARKER       = 0x00
 	BOOLEAN_MARKER      = 0x01
 	STRING_MARKER       = 0x02
 	OBJECT_MARKER       = 0x03
@@ -61,7 +61,6 @@ type AMF0Item struct {
 }
 
 func (v *AMF0Item) Dumps() []byte {
-	ol.T(nil, "this AMFOItem dumps")
 	var buf bytes.Buffer
 
 	buf.Write([]byte{v.Marker})
@@ -71,7 +70,7 @@ func (v *AMF0Item) Dumps() []byte {
 }
 
 func (v *AMF0Item) IsNumber() bool {
-	return v.Marker == NUMBER_MARKE
+	return v.Marker == NUMBER_MARKER
 }
 
 func (v *AMF0Item) IsBoolean() bool {
@@ -130,7 +129,7 @@ func (v *AMF0Item) IsRecordset() bool {
 	return v.Marker == RECORDESET_MARKER
 }
 
-func (v *AMF0Item) IsXmlDecument() bool {
+func (v *AMF0Item) IsXmlDocument() bool {
 	return v.Marker == XML_DOCUMENT_MARKER
 }
 
@@ -138,26 +137,26 @@ func (v *AMF0Item) IsTypedObject() bool {
 	return v.Marker == TYPED_OBJECT_MARKER
 }
 
-type AMF0Num struct {
+type AMF0Number struct {
 	AMF0Item
 	Number float64
 }
 
-func NewAMF0Num(num float64) *AMF0Num {
-	nu := &AMF0Num{
+func NewAMF0Number(num float64) *AMF0Number {
+	nu := &AMF0Number{
 		Number: num,
 	}
 
-	nu.Marker = NUMBER_MARKE
+	nu.Marker = NUMBER_MARKER
 
 	nu.Payload = make([]byte, 8)
 	binary.BigEndian.PutUint64(nu.Payload, math.Float64bits(nu.Number))
 	return nu
 }
 
-func ParseAMF0Num(reader io.Reader) (*AMF0Num, error) {
-	nu := &AMF0Num{}
-	nu.Marker = NUMBER_MARKE
+func ParseAMF0Number(reader io.Reader) (*AMF0Number, error) {
+	nu := &AMF0Number{}
+	nu.Marker = NUMBER_MARKER
 	nu.Payload = make([]byte, 8)
 	if n, err := io.ReadFull(reader, nu.Payload); err != nil {
 		return nil, err
@@ -179,6 +178,7 @@ func NewAMF0Boolean(isTrue bool) *AMF0Boolean {
 	it := &AMF0Boolean{
 		IsTrue: isTrue,
 	}
+	it.Marker = BOOLEAN_MARKER
 	it.Payload = make([]byte, 1)
 	if it.IsTrue {
 		it.Payload[0] = 1
@@ -262,6 +262,7 @@ func ParseAMF0String(reader io.Reader) (*AMF0String, error) {
 		return nil, err
 	}
 
+	it.Bytes = tmp
 	buf.Write(tmp)
 	it.Payload = buf.Bytes()
 	return it, nil
@@ -519,8 +520,8 @@ func ParseAmf0StrictArray(reader io.Reader) (*AMF0StrictArray, error) {
 			err = fmt.Errorf("size=%v of readed data is invalid, should be %v", n, 1)
 			return nil, err
 		}
-		if marker[0] == NUMBER_MARKE {
-			if el, err := ParseAMF0Num(reader); err != nil {
+		if marker[0] == NUMBER_MARKER {
+			if el, err := ParseAMF0Number(reader); err != nil {
 				return nil, err
 			} else {
 				it.ArrayList.PushBack(el)
